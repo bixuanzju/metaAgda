@@ -223,15 +223,14 @@ _++_ : ∀ {m n X} → Vec X m → Vec X n → Vec X (m + n)
 nPair : ∀ {X} (F G : Normal) → ⟦ F ⟧ X × ⟦ G ⟧ X → ⟦ F ×ₙ G ⟧ X
 nPair F G ((ShF , xsF) , ShG , xsG) = (ShF , ShG) , (xsF ++ xsG)
 
-vSplit : ∀ {X n} m → Vec X (m + n) → Vec X m × Vec X n
-vSplit zero vs = <> , vs
-vSplit (suc m) (x , vs) with vSplit m vs
-vSplit (suc m) (x , vs) | xs , ys = (x , xs) , ys
+vSplit : ∀ m n {X} (xs : Vec X (m + n)) → Image (uncurry (_++_ {m}{n}{X})) ∋ xs
+vSplit zero n xs = from (<> , xs)
+vSplit (suc m) n (x , xs) with vSplit m n xs
+vSplit (suc m) n (x , .(y ++ ys)) | from (y , ys) = from ((x , y) , ys)
 
--- Why the following doesn't work?
--- nSurj : ∀ {X} F G (s : ⟦ F ×ₙ G ⟧ X) → Image nPair F G ∋ s
--- nSurj F G ((ShF , ShG) , xs) with vSplit (size F ShF) xs
--- nSurj F G ((ShF , ShG) , xs) | xsF , xsG = from ((ShF , xsF) , ShG , xsG)
+nSurj : ∀ {X} F G (s : ⟦ F ×ₙ G ⟧ X) → Image nPair F G ∋ s
+nSurj F G ((shF , shG) , xs) with vSplit (size F shF) (size G shG) xs
+nSurj F G ((shF , shG) , .(xs ++ ys)) | from (xs , ys) = from ((shF , xs) , (shG , ys))
 
 -- Ex 1.14
 instance
@@ -285,9 +284,9 @@ _⊜_ : Normal → Normal → Normal
 (ShF / szF) ⊜ (ShG / szG) = ShF × ShG / uncurry (λ f g → szF f * szG g)
 
 tomato : ∀ m n {X} → Vec X (m * n) → Vec (Vec X n) m
-tomato zero n <> = <>
-tomato (suc m) n v with vSplit n v
-tomato (suc m) n v | ys , zs =  ys ,  tomato m n zs
+tomato zero n xs = <>
+tomato (suc m) n xs with vSplit n (m * n) xs
+tomato (suc m) n .(xs ++ ys) | from (xs , ys) = xs , tomato m n ys
 
 otamot : ∀ m n {X} → Vec (Vec X n) m → Vec X (m * n)
 otamot zero n <> = <>
