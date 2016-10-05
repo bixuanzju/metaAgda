@@ -1,9 +1,10 @@
 module MetaAgda where
 
 open import Data.Nat
-open import Data.Product hiding (zip; map) renaming (uncurry to ̌)
+open import Data.Product hiding (zip; map; swap)
 open import Function using (_∘_; id)
-open import Data.Unit using (⊤)
+open import Agda.Builtin.Equality
+
 
 data Vec (X : Set) : ℕ → Set where
   <> : Vec X zero
@@ -65,8 +66,9 @@ instance
   applicativeVec : ∀ {n} → Applicative λ X → Vec X n
   applicativeVec = record {pure = vec; _⊗_ = vapp}
 
-endoFunctorVec : ∀ {n} → EndoFunctor λ X → Vec X n
-endoFunctorVec = applicativeEndoFunctor
+instance
+  endoFunctorVec : ∀ {n} → EndoFunctor λ X → Vec X n
+  endoFunctorVec = applicativeEndoFunctor
 
 instance
   applicativeFun : ∀ {S} → Applicative λ X → S → X
@@ -98,9 +100,6 @@ instance
 applicativeVec₂ : ∀ {n} → Applicative λ X → Vec X n
 applicativeVec₂ = monadApplicative
 
-test : Vec ℕ 2
-test = ((λ x → x + 1) , (λ x → x + 2) , <>) ⊗ (1 , 2 , <>)
-
 -- Ex 1.7
 instance
   applicativeId : Applicative id
@@ -113,7 +112,7 @@ applicativeComp aF aG =
 
 -- Ex 1.8
 record Monoid (X : Set) : Set where
-  infixr 4 _·_
+  infixr 5 _·_
   field
     ε : X
     _·_ : X → X → X
@@ -146,14 +145,13 @@ instance
 
 -- Ex 1.10
 transpose : ∀ {m n X} → Vec (Vec X n) m → Vec (Vec X m) n
-transpose vs = traverse (\s → s) vs
+transpose vs = traverse id vs
 
-test2 : Vec (Vec ℕ 3) 2
-test2 = (1 , 2 , 3 , <>) , (4 , 5 , 6 , <>) , <>
+data One : Set where <> : One
 
 crush : ∀ {F X Y} {{TF : Traversable F}} {{M : Monoid Y}} →
           (X → Y) → F X → Y
-crush {{M = M}} = traverse {T = ⊤} {{AG = monoidApplicative {{M}}}}
+crush {{M = M}} = traverse {T = One} {{AG = monoidApplicative {{M}}}}
 
 test3 : ℕ
 test3 = crush {F = λ X → Vec X 2} ( λ x → x + 1) (1 , 2 , <>)
@@ -174,15 +172,6 @@ _<?>_ : ∀ {l} {P : Two → Set l} → P tt → P ff → (b : Two) → P b
 _⊹_ : Set → Set → Set
 S ⊹ T = Σ Two (S <?> T)
 
--- Ex 1.12
-_+ℕ_ : ℕ → ℕ → ℕ
-zero +ℕ y = y
-suc x +ℕ y = suc (x +ℕ y)
-
-_×ℕ_ : ℕ → ℕ → ℕ
-zero ×ℕ y = zero
-suc x ×ℕ y = y +ℕ (x ×ℕ y)
-
 record Normal : Set₁ where
   constructor _/_
   field
@@ -194,7 +183,7 @@ open Normal public
 infixr 0 _/_
 
 VecN : ℕ → Normal
-VecN n = ⊤ / pure n
+VecN n = One / pure n
 
 ListN : Normal
 ListN = ℕ / id
@@ -206,10 +195,10 @@ IKₙ : Normal
 IKₙ = VecN 1
 
 _+ₙ_ : Normal → Normal → Normal
-(ShF / szF) +ₙ (ShG / scG) = (ShF ⊹ ShG) / ̌ (szF <?> scG)
+(ShF / szF) +ₙ (ShG / scG) = (ShF ⊹ ShG) / uncurry (szF <?> scG)
 
 _×ₙ_ : Normal → Normal → Normal
-(ShF / szF) ×ₙ (ShG / scG) = (ShF × ShG) / ̌ (λ f g → szF f +ℕ scG g)
+(ShF / szF) ×ₙ (ShG / scG) = (ShF × ShG) / uncurry (λ f g → szF f + scG g)
 
 nInj : ∀ {X} (F G : Normal) → ⟦ F ⟧ X ⊹ ⟦ G ⟧ X → ⟦ F +ₙ G ⟧ X
 nInj F G (tt , ShF , xs) = (tt , ShF) , xs
@@ -222,20 +211,19 @@ nCase : ∀ {X} F G (s : ⟦ F +ₙ G ⟧ X) → Image nInj F G ∋ s
 nCase F G ((tt , ShF) , xs) = from (tt , ShF , xs)
 nCase F G ((ff , ShG) , xs) = from (ff , ShG , xs)
 
-
 nOut : ∀ {X} (F G : Normal) → ⟦ F +ₙ G ⟧ X → ⟦ F ⟧ X ⊹ ⟦ G ⟧ X
 nOut F G xs' with nCase F G xs'
 nOut F G .(nInj F G x) | from x = x
 
 -- Ex 1.13
-_++_ : ∀ {m n X} → Vec X m → Vec X n → Vec X (m +ℕ n)
+_++_ : ∀ {m n X} → Vec X m → Vec X n → Vec X (m + n)
 <> ++ ys = ys
 (x , xs) ++ ys = x , xs ++ ys
 
 nPair : ∀ {X} (F G : Normal) → ⟦ F ⟧ X × ⟦ G ⟧ X → ⟦ F ×ₙ G ⟧ X
 nPair F G ((ShF , xsF) , ShG , xsG) = (ShF , ShG) , (xsF ++ xsG)
 
-vSplit : ∀ {X n} m → Vec X (m +ℕ n) → Vec X m × Vec X n
+vSplit : ∀ {X n} m → Vec X (m + n) → Vec X m × Vec X n
 vSplit zero vs = <> , vs
 vSplit (suc m) (x , vs) with vSplit m vs
 vSplit (suc m) (x , vs) | xs , ys = (x , xs) , ys
@@ -246,17 +234,144 @@ vSplit (suc m) (x , vs) | xs , ys = (x , xs) , ys
 -- nSurj F G ((ShF , ShG) , xs) | xsF , xsG = from ((ShF , xsF) , ShG , xsG)
 
 -- Ex 1.14
-listNMonoid : {X : Set} → Monoid (⟦ ListN ⟧ X)
-listNMonoid {X} = record { ε = zero , <> ; _·_ = h }
-  where h : ⟦ ListN ⟧ X → ⟦ ListN ⟧ X → ⟦ ListN ⟧ X
-        h (n , xs) (m , ys) = (n +ℕ m) , (xs ++ ys)
+instance
+  listNMonoid : {X : Set} → Monoid (⟦ ListN ⟧ X)
+  listNMonoid {X} = record { ε = zero , <> ; _·_ = h }
+    where h : ⟦ ListN ⟧ X → ⟦ ListN ⟧ X → ⟦ ListN ⟧ X
+          h (n , xs) (m , ys) = (n + m) , (xs ++ ys)
 
 sumMonoid : Monoid ℕ
-sumMonoid = record { ε = zero ; _·_ = _+ℕ_ }
+sumMonoid = record { ε = zero ; _·_ = _+_ }
 
 normalTraversable : (F : Normal) → Traversable ⟦ F ⟧
 normalTraversable F =
-  record { traverse = λ {{aG}} f → ̌ (λ s xs → pure {{aG}} (_,_ s) ⊗ traverse f xs) }
+  record { traverse = λ {{aG}} f → uncurry (λ s xs → pure {{aG}} (_,_ s) ⊗ traverse f xs) }
 
 _∘ₙ_ : Normal → Normal → Normal
 F ∘ₙ (ShG / szG) = (⟦ F ⟧ ShG) / crush {{normalTraversable F}} szG
+
+sizeT : ∀ {F} {{TF : Traversable F}} {X} → F X → ℕ
+sizeT = crush (λ _ → 1)
+
+normalT : ∀ F {{TF : Traversable F}} → Normal
+normalT F = (F One) / sizeT
+
+shapeT : ∀ {F} {{TF : Traversable F}} {X} → F X → F One
+shapeT = traverse (λ _ → <>)
+
+one : ∀ {X} → X → ⟦ ListN ⟧ X
+one x = 1 , (x , <>)
+
+-- Extract its context, put them in a vector, along with the size
+contextT : ∀ {F} {{TF : Traversable F}} {X} → F X → ⟦ ListN ⟧ X
+contextT = crush one
+
+-- Ex 1.15
+_→ₙ_ : Normal → Normal → Set
+F →ₙ G = (s : Shape F) → ⟦ G ⟧ (Fin (size F s))
+
+nMorph : ∀ {F G} → F →ₙ G → ∀ {X} → ⟦ F ⟧ X → ⟦ G ⟧ X
+nMorph f (s , xs) with f s
+nMorph f (s , xs) | s' , is = s' , map (proj xs) is
+
+
+-- tabulate id generate a vector with elements of its own indexes
+morphN : ∀ {F G} → (∀ {X} → ⟦ F ⟧ X → ⟦ G ⟧ X) → F →ₙ G
+morphN {F} f s with f (s , tabulate id)
+morphN {F} f s | sh , xs = sh , xs
+
+-- Ex 1.16
+_⊜_ : Normal → Normal → Normal
+(ShF / szF) ⊜ (ShG / szG) = ShF × ShG / uncurry (λ f g → szF f * szG g)
+
+tomato : ∀ m n {X} → Vec X (m * n) → Vec (Vec X n) m
+tomato zero n <> = <>
+tomato (suc m) n v with vSplit n v
+tomato (suc m) n v | ys , zs =  ys ,  tomato m n zs
+
+otamot : ∀ m n {X} → Vec (Vec X n) m → Vec X (m * n)
+otamot zero n <> = <>
+otamot (suc n) m (xs , xss) = xs ++ otamot n m xss
+
+swap : (F G : Normal) → (F ⊜ G) →ₙ (G ⊜ F)
+swap F G (shF , shG) = (shG , shF) , otamot (size G shG) (size F shF) (transpose (tomato (size F shF) (size G shG) (tabulate id)))
+
+subst : ∀ {k l} {X : Set k} {s t : X} → s ≡ t → (P : X → Set l) → P s → P t
+subst refl P p = p
+
+drop : (F G : Normal) → (F ⊜ G) →ₙ (F ∘ₙ G)
+drop F G (shF , shG) = (shF , (vec shG)) , subst (help (size F shF)) (Vec _) (tabulate id) where
+  help : ∀ n → (n * size G shG) ≡ crush (size G) (vec {n} shG)
+  help zero = refl
+  help (suc n) rewrite help n = refl
+
+
+record MonoidOk X {{M : Monoid X}} : Set where
+  field
+    absorbL : (x : X) → ε · x ≡ x
+    absorbR : (x : X) → x · ε ≡ x
+    assoc   : (x y z : X) → (x · y) · z ≡ x · (y · z)
+
+_+zero : ∀ x → x + zero ≡ x
+zero +zero = refl
+suc x +zero rewrite x +zero = refl
+
+assoc+ : ∀ x y z → (x + y) + z ≡ x + (y + z)
+assoc+ zero y z = refl
+assoc+ (suc x) y z rewrite assoc+ x y z = refl
+
+natMonoidOK : MonoidOk ℕ
+natMonoidOK = record
+  { absorbL = λ _ → refl
+  ; absorbR = _+zero
+  ; assoc = assoc+
+  }
+
+
+listNMonoidOK : {X : Set} → MonoidOk (⟦ ListN ⟧ X)
+listNMonoidOK {X} = record
+  { absorbL = λ _ → refl
+  ; absorbR =  uncurry aR
+  ; assoc = uncurry aa
+  } where
+  aR : ∀ n (xs : Vec X n) → (n , xs) · ε {{listNMonoid}} ≡ (n , xs)
+  aR zero <> = refl
+  aR (suc n) (x , xs) = subst (aR n xs)
+                          (uncurry (λ m ys → (suc (n + 0) , x , (xs ++ <>)) ≡ (suc m , x , ys))) refl
+  aa : ∀ n (xs : Vec X n) (ys zs : ⟦ ListN ⟧ X) →
+       ((n , xs) · ys) · zs ≡ (n , xs) · (ys · zs)
+  aa zero <> ys zs = refl
+  aa (suc n) (x , xs) (i , ys) (j , zs) =
+    subst (aa n xs (i , ys) (j , zs)) (uncurry (λ m ms → _≡_ {_} {⟦ ListN ⟧ X} (suc (n + i + j) , (x , ((xs ++ ys) ++ zs))) (suc m , (x , ms)))) refl
+
+-- Ex 1.18
+-- I cannot even write the type because _≡_ requires the types of the arguments syntactically equal.
+
+record MonoidHom {X} {{MX : Monoid X}} {Y} {{MY : Monoid Y}} (f : X → Y) : Set where
+  field
+    respε : f ε ≡ ε
+    resp· : ∀ x x' → f (x · x') ≡ f x · f x'
+
+fstHom : ∀ {X} → MonoidHom {⟦ ListN ⟧ X} {ℕ} proj₁
+fstHom = record { respε = refl ; resp· = λ _ _ → refl }
+
+_=̇_ : ∀ {l} {S : Set l} {T : S → Set l} (f g : (x : S) → T x) → Set l
+f =̇ g = ∀ x → f x ≡ g x
+infix 1 _=̇_
+
+record EndoFunctorOKP F {{FF : EndoFunctor F}} : Set₁ where
+  field
+    endoFunctorId : ∀ {X} → map {{FF}} {X} id =̇ id
+    endoFunctorCo : ∀ {R S T} (f : S → T) (g : R → S) →
+                    map {{FF}} f ∘ map g =̇ map (f ∘ g)
+
+-- Ex 1.19
+vecEndoFunctorOKP : ∀ {n} → EndoFunctorOKP λ X → Vec X n
+vecEndoFunctorOKP = record { endoFunctorId = vappid ; endoFunctorCo = vappco } where
+  vappid : ∀ {X n} → (x : Vec X n) → vapp (vec id) x ≡ x
+  vappid <> = refl
+  vappid (x , xs) rewrite vappid xs = refl
+  vappco : ∀ {n R S T} → (f : S → T) (g : R → S) (x : Vec R n) →
+           vapp (vec f) (vapp (vec g) x) ≡ vapp (vec (λ s → f (g s))) x
+  vappco f g <> = refl
+  vappco f g (x , xs) rewrite vappco f g xs = refl
