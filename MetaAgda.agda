@@ -374,3 +374,61 @@ vecEndoFunctorOKP = record { endoFunctorId = vappid ; endoFunctorCo = vappco } w
            vapp (vec f) (vapp (vec g) x) ≡ vapp (vec (λ s → f (g s))) x
   vappco f g <> = refl
   vappco f g (x , xs) rewrite vappco f g xs = refl
+
+
+_=[_>_ : ∀ {l} {X : Set l} (x : X) {y z} → x ≡ y → y ≡ z → x ≡ z
+_ =[ refl > q = q
+
+_<_]=_ : ∀ {l} {X : Set l} (x : X) {y z} → y ≡ x → y ≡ z → x ≡ z
+_ < refl ]= q = q
+
+_□ : ∀ {l} {X : Set l} (x : X) → x ≡ x
+x □ = refl
+
+infixr 1 _=[_>_ _<_]=_ _□
+
+cong : ∀ {k l} {X : Set k} {Y : Set l} (f : X → Y) {x y} → x ≡ y → f x ≡ f y
+cong f refl = refl
+
+record ApplicativeOKP F {{AF : Applicative F}} : Set₁ where
+  field
+    lawId : ∀ {X} (x : F X) → (pure {{AF}} id ⊗ x) ≡ x
+    lawCo : ∀ {R S T} (f : F (S → T)) (g : F (R → S)) (r : F R) →
+            (pure {{AF}} (λ f g → f ∘ g) ⊗ f ⊗ g ⊗ r) ≡ (f ⊗ (g ⊗ r))
+    lawHom : ∀ {S T} (f : S → T) (s : S) →
+             (pure {{AF}} f ⊗ pure s) ≡ pure (f s)
+    lawCom : ∀ {S T} (f : F (S → T)) (s : S) →
+             (f ⊗ pure s) ≡ (pure {{AF}} (λ f → f s) ⊗ f)
+  applicativeEndoFunctorOKP : EndoFunctorOKP F {{applicativeEndoFunctor}}
+  applicativeEndoFunctorOKP = record
+    { endoFunctorId = lawId
+    ; endoFunctorCo = λ f g r →
+       pure {{AF}} f ⊗ (pure {{AF}} g ⊗ r)
+         < lawCo (pure f) (pure g) r ]=
+       pure {{AF}} (λ f g → f ∘ g) ⊗ pure f ⊗ pure g ⊗ r
+         =[ cong (λ x → x ⊗ pure g ⊗ r) (lawHom (λ f g → f ∘ g ) f) >
+       pure {{AF}} (_∘_ f) ⊗ (pure g) ⊗ r
+         =[ cong (λ x → x ⊗ r) (lawHom (_∘_ f) g) > (pure {{AF}} (f ∘ g) ⊗ r □)
+    }
+
+-- Ex 1.20
+vecApplicativeOKP : {n : ℕ} → ApplicativeOKP λ X → Vec X n
+vecApplicativeOKP = record
+  { lawId = vecId
+  ; lawCo = vecCo
+  ; lawHom = vecHom
+  ; lawCom = vecCom
+  } where
+  vecId : ∀ {X n} (x : Vec X n) → vapp (vec id) x ≡ x
+  vecId <> = refl
+  vecId (x , xs) rewrite vecId xs = refl
+  vecCo : ∀ {R S T n} → (f : Vec (S → T) n) → (g : Vec (R → S) n) → (r : Vec R n) →
+          vapp (vapp (vapp (vec (λ f g → f ∘ g)) f) g) r ≡ vapp f (vapp g r)
+  vecCo {n = zero} <> <> <> = refl
+  vecCo {n = suc m} (f , fs) (g , gs) (r , rs) rewrite vecCo {n = m} fs gs rs  = refl
+  vecHom : ∀ {S T n} → (f : S → T) (s : S) → vapp {n = n} (vec f) (vec s) ≡ vec (f s)
+  vecHom {n = zero} f s = refl
+  vecHom {n = suc m} f s rewrite vecHom {n = m} f s = refl
+  vecCom : ∀ {S T n} → (f : Vec (S → T) n) (s : S) → vapp f (vec s) ≡ vapp (vec (λ f → f s)) f
+  vecCom {n = zero} <> s = refl
+  vecCom {n = suc m} (f , fs) s rewrite vecCom {n = m} fs s = refl
