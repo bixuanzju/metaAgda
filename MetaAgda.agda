@@ -125,7 +125,12 @@ instance
   ℕ-monoid = record {ε = 0; _·_ = _+_}
 
 -- Ex 1.9
--- What is point-wise product?
+applicativeProd : ∀ {F G} → Applicative F → Applicative G → Applicative λ X → F X × G X
+applicativeProd AF AG = record
+  { pure = λ x → pure {{AF}} x , pure {{AG}} x
+  ; _⊗_ = uncurry (λ fs gs → uncurry (λ f g → _⊗_ {{AF}} fs f , _⊗_ {{AG}} gs g))
+  }
+
 
 record Traversable (F : Set → Set) : Set₁ where
   field
@@ -376,16 +381,19 @@ vecEndoFunctorOKP = record { endoFunctorId = vappid ; endoFunctorCo = vappco } w
   vappco f g (x , xs) rewrite vappco f g xs = refl
 
 
-_=[_>_ : ∀ {l} {X : Set l} (x : X) {y z} → x ≡ y → y ≡ z → x ≡ z
-_ =[ refl > q = q
+_≡⟨_⟩_  : ∀ {l} {X : Set l} (x : X) {y z} → x ≡ y → y ≡ z → x ≡ z
+_ ≡⟨ refl ⟩ q = q
 
-_<_]=_ : ∀ {l} {X : Set l} (x : X) {y z} → y ≡ x → y ≡ z → x ≡ z
-_ < refl ]= q = q
+_⟨_⟩≡_ : ∀ {l} {X : Set l} (x : X) {y z} → y ≡ x → y ≡ z → x ≡ z
+_ ⟨ refl ⟩≡ q = q
+
+⟨⟩_ : ∀ {l} {X : Set l} {x y : X} → x ≡ y → y ≡ x
+⟨⟩ refl = refl
 
 _□ : ∀ {l} {X : Set l} (x : X) → x ≡ x
 x □ = refl
 
-infixr 1 _=[_>_ _<_]=_ _□
+infixr 1 _≡⟨_⟩_ _⟨_⟩≡_ _□
 
 cong : ∀ {k l} {X : Set k} {Y : Set l} (f : X → Y) {x y} → x ≡ y → f x ≡ f y
 cong f refl = refl
@@ -403,12 +411,13 @@ record ApplicativeOKP F {{AF : Applicative F}} : Set₁ where
   applicativeEndoFunctorOKP = record
     { endoFunctorId = lawId
     ; endoFunctorCo = λ f g r →
-       pure {{AF}} f ⊗ (pure {{AF}} g ⊗ r)
-         < lawCo (pure f) (pure g) r ]=
-       pure {{AF}} (λ f g → f ∘ g) ⊗ pure f ⊗ pure g ⊗ r
-         =[ cong (λ x → x ⊗ pure g ⊗ r) (lawHom (λ f g → f ∘ g ) f) >
-       pure {{AF}} (_∘_ f) ⊗ (pure g) ⊗ r
-         =[ cong (λ x → x ⊗ r) (lawHom (_∘_ f) g) > (pure {{AF}} (f ∘ g) ⊗ r □)
+            pure {{AF}} f ⊗ (pure {{AF}} g ⊗ r)
+          ⟨ lawCo (pure f) (pure g) r ⟩≡
+            pure {{AF}} (λ f g → f ∘ g) ⊗ pure f ⊗ pure g ⊗ r
+         ≡⟨ cong (λ x → x ⊗ pure g ⊗ r) (lawHom (λ f g → f ∘ g ) f) ⟩
+            pure {{AF}} (_∘_ f) ⊗ (pure g) ⊗ r
+         ≡⟨ cong (λ x → x ⊗ r) (lawHom (_∘_ f) g) ⟩
+            (pure {{AF}} (f ∘ g) ⊗ r □)
     }
 
 -- Ex 1.20
@@ -432,3 +441,109 @@ vecApplicativeOKP = record
   vecCom : ∀ {S T n} → (f : Vec (S → T) n) (s : S) → vapp f (vec s) ≡ vapp (vec (λ f → f s)) f
   vecCom {n = zero} <> s = refl
   vecCom {n = suc m} (f , fs) s rewrite vecCom {n = m} fs s = refl
+
+
+_→̇_ : ∀ (F G : Set → Set) → Set₁
+F →̇ G = ∀ {X} → F X → G X
+
+record AppHom {F} {{AF : Applicative F}} {G} {{AG : Applicative G}}
+              (k : F →̇ G) : Set₁ where
+  field
+    respPure : ∀ {X} (x : X) → k (pure x) ≡ pure x
+    resp⊗ : ∀ {S T} (f : F (S → T)) (s : F S) → k (f ⊗ s) ≡ (k f ⊗ k s)
+
+monoidApplicativeHom :
+  ∀ {X} {{MX : Monoid X}} {Y} {{MY : Monoid Y}}
+  (f : X → Y) {{hf : MonoidHom f}} →
+  AppHom {{monoidApplicative {{MX}}}} {{monoidApplicative {{MY}}}} f
+monoidApplicativeHom f {{hf}} = record
+  { respPure = λ x → MonoidHom.respε hf
+  ; resp⊗ = MonoidHom.resp· hf
+  }
+
+-- Ex 1.21
+homSum : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
+         (f : F →̇ G) →
+         Applicative λ X → F X ⊹ G X
+homSum {F} {G} {{AF}} {{AG}} f = record
+  { pure = λ x → tt , (pure x)
+  ; _⊗_ = h
+  } where
+  h : ∀ {S T} → Σ Two (F (S → T) <?> G (S → T)) → Σ Two (F S <?> G S) → Σ Two (F T <?> G T)
+  h (tt , fst) (tt , fs) = tt , (fst ⊗ fs)
+  h (tt , fst) (ff , gs) = ff , (f fst ⊗ gs)
+  h (ff , gst) (tt , fs) = ff , (gst ⊗ f fs)
+  h (ff , gst) (ff , gs) = ff , (gst ⊗ gs)
+
+homSumOKP : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
+            ApplicativeOKP F → ApplicativeOKP G →
+            (f : F →̇ G) → AppHom {{AF}} {{AG}} f →
+            ApplicativeOKP _ {{homSum {{AF}} {{AG}} f}}
+homSumOKP {F} {G} {{AF}} {{AG}} FOK GOK f homf = record
+  { lawId = homSumId
+  ; lawCo = homSumCo
+  ; lawHom = homSumHom
+  ; lawCom = homSumCom
+  } where
+  homSumId : ∀ {X} (x : Σ Two (F X <?> G X)) →
+      (_⊗_ {{homSum f}} (pure {{homSum f}} id) x) ≡ x
+  homSumId (tt , fx) rewrite ApplicativeOKP.lawId FOK fx = refl
+  homSumId (ff , gx) =
+    cong (λ x → ff , x)
+         ((f (pure id)) ⊗ gx
+             ≡⟨ cong (λ x → _⊗_ x gx) (AppHom.respPure homf id) ⟩
+                ApplicativeOKP.lawId GOK gx)
+  homSumCo : ∀ {R S T} → (fs : F (S → T) ⊹ G (S → T)) → (g : F (R → S) ⊹ G (R → S)) → (r : F R ⊹ G R) →
+             _⊗_ {{homSum f}} (_⊗_ {{homSum f}} (_⊗_ {{homSum f}} (pure {{homSum f}} (λ aa bb → aa ∘ bb)) fs) g) r
+             ≡ _⊗_ {{homSum f}} fs (_⊗_ {{homSum f}} g r)
+  homSumCo (tt , fst) (tt , frs) (tt , fr) = cong (λ x → (tt , x)) (ApplicativeOKP.lawCo FOK fst frs fr)
+  homSumCo (tt , fst) (tt , frs) (ff , gr) =
+    cong (λ x → (ff , x))
+    (f ((pure {{AF}} (λ f g → f ∘ g)) ⊗ fst ⊗ frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gr) (AppHom.resp⊗ homf (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) frs) ⟩
+    f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f frs) ⊗ gr) (AppHom.resp⊗ homf (pure (λ aa bb → aa ∘ bb)) fst) ⟩
+    f (pure (λ aa bb → aa ∘ bb)) ⊗ (f fst) ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ aa bb → aa ∘ bb)) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) (f frs) gr)
+  homSumCo (tt , fst) (ff , grs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ grs ⊗ (f fr)) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) grs (f fr))
+  homSumCo (tt , fst) (ff , grs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ grs ⊗ gr) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ gr) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) grs gr)
+  homSumCo (ff , gst) (tt , frs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+      (⟨⟩ (gst ⊗ (f (frs ⊗ fr))
+      ≡⟨ cong (λ x → gst ⊗ x) (AppHom.resp⊗ homf frs fr) ⟩
+      (⟨⟩ ApplicativeOKP.lawCo GOK gst (f frs) (f fr)))))
+  homSumCo (ff , gst) (tt , frs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst (f frs) gr))
+  homSumCo (ff , gst) (ff , grs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst grs (f fr)))
+  homSumCo (ff , gst) (ff , grs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst grs gr))
+  homSumHom : ∀ {S T} → (st : S → T) (s : S) →
+              (_⊗_ {{homSum f}} (pure {{homSum f}} st) (pure {{homSum f}} s)) ≡ (pure {{homSum f}} (st s))
+  homSumHom st s  = cong (λ x → (tt , x)) (ApplicativeOKP.lawHom FOK st s)
+  homSumCom : ∀ {S T} → (fg : F (S → T) ⊹ G (S → T)) (s : S) →
+              _⊗_ {{homSum f}} fg (pure {{homSum f}} s) ≡ _⊗_ {{homSum f}} (pure {{homSum f}} (λ f → f s)) fg
+  homSumCom (tt , fst) s = cong (λ x → (tt , x)) (ApplicativeOKP.lawCom FOK fst s)
+  homSumCom (ff , gst) s =
+    cong (λ x → (ff , x)) (gst ⊗ (f (pure s))
+      ≡⟨ (cong (λ x → gst ⊗ x) (AppHom.respPure homf s)) ⟩
+      (⟨⟩ (f (pure (λ fs → fs s)) ⊗ gst ≡⟨ cong (λ x → x ⊗ gst) (AppHom.respPure homf (λ fs → fs s)) ⟩
+      (⟨⟩ ApplicativeOKP.lawCom GOK gst s))))
