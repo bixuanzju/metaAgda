@@ -1,9 +1,10 @@
 module Normal where
 
 open import Data.Nat
-open import Data.Product hiding (zip; map; swap)
+open import Data.Product hiding (zip; map; swap) renaming (proj₁ to fst; proj₂ to snd)
 open import Function using (_∘_; id)
 open import Agda.Builtin.Equality
+open import Data.Empty
 
 open import Vect
 
@@ -13,7 +14,8 @@ record Normal : Set₁ where
     Shape : Set
     size : Shape → ℕ
   ⟦_⟧ : Set → Set
-  ⟦_⟧ X = Σ Shape λ s → Vec X (size s)
+  ⟦_⟧ X = Σ[ x ∈ Shape ] (Vec X (size x))
+
 open Normal public
 infixr 0 _/_
 
@@ -187,7 +189,7 @@ record MonoidHom {X} {{MX : Monoid X}} {Y} {{MY : Monoid Y}} (f : X → Y) : Set
     resp· : ∀ x x' → f (x · x') ≡ f x · f x'
 
 instance
-  fstHom : ∀ {X} → MonoidHom {⟦ ListN ⟧ X} {ℕ} proj₁
+  fstHom : ∀ {X} → MonoidHom {⟦ ListN ⟧ X} {ℕ} fst
   fstHom = record { respε = refl ; resp· = λ _ _ → refl }
 
 _=̇_ : ∀ {l} {S : Set l} {T : S → Set l} (f g : (x : S) → T x) → Set l
@@ -306,78 +308,79 @@ homSum {F} {G} {{AF}} {{AG}} f = record
   h (ff , gst) (tt , fs) = ff , (gst ⊗ f fs)
   h (ff , gst) (ff , gs) = ff , (gst ⊗ gs)
 
-homSumOKP : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
-            ApplicativeOKP F → ApplicativeOKP G →
-            (f : F →̇ G) → AppHom {{AF}} {{AG}} f →
-            ApplicativeOKP _ {{homSum {{AF}} {{AG}} f}}
-homSumOKP {F} {G} {{AF}} {{AG}} FOK GOK f homf = record
-  { lawId = homSumId
-  ; lawCo = homSumCo
-  ; lawHom = homSumHom
-  ; lawCom = homSumCom
-  } where
-  homSumId : ∀ {X} (x : Σ Two (F X <?> G X)) →
-      (_⊗_ {{homSum f}} (pure {{homSum f}} id) x) ≡ x
-  homSumId (tt , fx) rewrite ApplicativeOKP.lawId FOK fx = refl
-  homSumId (ff , gx) =
-    cong (λ x → ff , x)
-         ((f (pure id)) ⊗ gx
-             ≡⟨ cong (λ x → _⊗_ x gx) (AppHom.respPure homf id) ⟩
-                ApplicativeOKP.lawId GOK gx)
-  homSumCo : ∀ {R S T} → (fs : F (S → T) ⊹ G (S → T)) → (g : F (R → S) ⊹ G (R → S)) → (r : F R ⊹ G R) →
-             _⊗_ {{homSum f}} (_⊗_ {{homSum f}} (_⊗_ {{homSum f}} (pure {{homSum f}} (λ aa bb → aa ∘ bb)) fs) g) r
-             ≡ _⊗_ {{homSum f}} fs (_⊗_ {{homSum f}} g r)
-  homSumCo (tt , fst) (tt , frs) (tt , fr) = cong (λ x → (tt , x)) (ApplicativeOKP.lawCo FOK fst frs fr)
-  homSumCo (tt , fst) (tt , frs) (ff , gr) =
-    cong (λ x → (ff , x))
-    (f ((pure {{AF}} (λ f g → f ∘ g)) ⊗ fst ⊗ frs) ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ gr) (AppHom.resp⊗ homf (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) frs) ⟩
-    f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ (f frs) ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ (f frs) ⊗ gr) (AppHom.resp⊗ homf (pure (λ aa bb → aa ∘ bb)) fst) ⟩
-    f (pure (λ aa bb → aa ∘ bb)) ⊗ (f fst) ⊗ (f frs) ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ aa bb → aa ∘ bb)) ⟩
-    ApplicativeOKP.lawCo GOK (f fst) (f frs) gr)
-  homSumCo (tt , fst) (ff , grs) (tt , fr) =
-    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ (f fr)
-      ≡⟨ cong (λ x → x ⊗ grs ⊗ (f fr)) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
-    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ (f fr)
-      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
-    ApplicativeOKP.lawCo GOK (f fst) grs (f fr))
-  homSumCo (tt , fst) (ff , grs) (ff , gr) =
-    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ grs ⊗ gr) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
-    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ gr) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
-    ApplicativeOKP.lawCo GOK (f fst) grs gr)
-  homSumCo (ff , gst) (tt , frs) (tt , fr) =
-    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ (f fr)
-      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
-      (⟨⟩ (gst ⊗ (f (frs ⊗ fr))
-      ≡⟨ cong (λ x → gst ⊗ x) (AppHom.resp⊗ homf frs fr) ⟩
-      (⟨⟩ ApplicativeOKP.lawCo GOK gst (f frs) (f fr)))))
-  homSumCo (ff , gst) (tt , frs) (ff , gr) =
-    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
-    (ApplicativeOKP.lawCo GOK gst (f frs) gr))
-  homSumCo (ff , gst) (ff , grs) (tt , fr) =
-    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ (f fr)
-      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
-    (ApplicativeOKP.lawCo GOK gst grs (f fr)))
-  homSumCo (ff , gst) (ff , grs) (ff , gr) =
-    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ gr
-      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
-    (ApplicativeOKP.lawCo GOK gst grs gr))
-  homSumHom : ∀ {S T} → (st : S → T) (s : S) →
-              (_⊗_ {{homSum f}} (pure {{homSum f}} st) (pure {{homSum f}} s)) ≡ (pure {{homSum f}} (st s))
-  homSumHom st s  = cong (λ x → (tt , x)) (ApplicativeOKP.lawHom FOK st s)
-  homSumCom : ∀ {S T} → (fg : F (S → T) ⊹ G (S → T)) (s : S) →
-              _⊗_ {{homSum f}} fg (pure {{homSum f}} s) ≡ _⊗_ {{homSum f}} (pure {{homSum f}} (λ f → f s)) fg
-  homSumCom (tt , fst) s = cong (λ x → (tt , x)) (ApplicativeOKP.lawCom FOK fst s)
-  homSumCom (ff , gst) s =
-    cong (λ x → (ff , x)) (gst ⊗ (f (pure s))
-      ≡⟨ (cong (λ x → gst ⊗ x) (AppHom.respPure homf s)) ⟩
-      (⟨⟩ (f (pure (λ fs → fs s)) ⊗ gst ≡⟨ cong (λ x → x ⊗ gst) (AppHom.respPure homf (λ fs → fs s)) ⟩
-      (⟨⟩ ApplicativeOKP.lawCom GOK gst s))))
+-- Comment for the sake of compilation speed
+-- homSumOKP : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
+--             ApplicativeOKP F → ApplicativeOKP G →
+--             (f : F →̇ G) → AppHom {{AF}} {{AG}} f →
+--             ApplicativeOKP _ {{homSum {{AF}} {{AG}} f}}
+-- homSumOKP {F} {G} {{AF}} {{AG}} FOK GOK f homf = record
+--   { lawId = homSumId
+--   ; lawCo = homSumCo
+--   ; lawHom = homSumHom
+--   ; lawCom = homSumCom
+--   } where
+--   homSumId : ∀ {X} (x : Σ Two (F X <?> G X)) →
+--       (_⊗_ {{homSum f}} (pure {{homSum f}} id) x) ≡ x
+--   homSumId (tt , fx) rewrite ApplicativeOKP.lawId FOK fx = refl
+--   homSumId (ff , gx) =
+--     cong (λ x → ff , x)
+--          ((f (pure id)) ⊗ gx
+--              ≡⟨ cong (λ x → _⊗_ x gx) (AppHom.respPure homf id) ⟩
+--                 ApplicativeOKP.lawId GOK gx)
+--   homSumCo : ∀ {R S T} → (fs : F (S → T) ⊹ G (S → T)) → (g : F (R → S) ⊹ G (R → S)) → (r : F R ⊹ G R) →
+--              _⊗_ {{homSum f}} (_⊗_ {{homSum f}} (_⊗_ {{homSum f}} (pure {{homSum f}} (λ aa bb → aa ∘ bb)) fs) g) r
+--              ≡ _⊗_ {{homSum f}} fs (_⊗_ {{homSum f}} g r)
+--   homSumCo (tt , fst) (tt , frs) (tt , fr) = cong (λ x → (tt , x)) (ApplicativeOKP.lawCo FOK fst frs fr)
+--   homSumCo (tt , fst) (tt , frs) (ff , gr) =
+--     cong (λ x → (ff , x))
+--     (f ((pure {{AF}} (λ f g → f ∘ g)) ⊗ fst ⊗ frs) ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ gr) (AppHom.resp⊗ homf (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) frs) ⟩
+--     f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ (f frs) ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ (f frs) ⊗ gr) (AppHom.resp⊗ homf (pure (λ aa bb → aa ∘ bb)) fst) ⟩
+--     f (pure (λ aa bb → aa ∘ bb)) ⊗ (f fst) ⊗ (f frs) ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ aa bb → aa ∘ bb)) ⟩
+--     ApplicativeOKP.lawCo GOK (f fst) (f frs) gr)
+--   homSumCo (tt , fst) (ff , grs) (tt , fr) =
+--     cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ (f fr)
+--       ≡⟨ cong (λ x → x ⊗ grs ⊗ (f fr)) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+--     f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ (f fr)
+--       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+--     ApplicativeOKP.lawCo GOK (f fst) grs (f fr))
+--   homSumCo (tt , fst) (ff , grs) (ff , gr) =
+--     cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ grs ⊗ gr) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+--     f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ gr) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+--     ApplicativeOKP.lawCo GOK (f fst) grs gr)
+--   homSumCo (ff , gst) (tt , frs) (tt , fr) =
+--     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ (f fr)
+--       ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+--       (⟨⟩ (gst ⊗ (f (frs ⊗ fr))
+--       ≡⟨ cong (λ x → gst ⊗ x) (AppHom.resp⊗ homf frs fr) ⟩
+--       (⟨⟩ ApplicativeOKP.lawCo GOK gst (f frs) (f fr)))))
+--   homSumCo (ff , gst) (tt , frs) (ff , gr) =
+--     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+--     (ApplicativeOKP.lawCo GOK gst (f frs) gr))
+--   homSumCo (ff , gst) (ff , grs) (tt , fr) =
+--     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ (f fr)
+--       ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+--     (ApplicativeOKP.lawCo GOK gst grs (f fr)))
+--   homSumCo (ff , gst) (ff , grs) (ff , gr) =
+--     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ gr
+--       ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+--     (ApplicativeOKP.lawCo GOK gst grs gr))
+--   homSumHom : ∀ {S T} → (st : S → T) (s : S) →
+--               (_⊗_ {{homSum f}} (pure {{homSum f}} st) (pure {{homSum f}} s)) ≡ (pure {{homSum f}} (st s))
+--   homSumHom st s  = cong (λ x → (tt , x)) (ApplicativeOKP.lawHom FOK st s)
+--   homSumCom : ∀ {S T} → (fg : F (S → T) ⊹ G (S → T)) (s : S) →
+--               _⊗_ {{homSum f}} fg (pure {{homSum f}} s) ≡ _⊗_ {{homSum f}} (pure {{homSum f}} (λ f → f s)) fg
+--   homSumCom (tt , fst) s = cong (λ x → (tt , x)) (ApplicativeOKP.lawCom FOK fst s)
+--   homSumCom (ff , gst) s =
+--     cong (λ x → (ff , x)) (gst ⊗ (f (pure s))
+--       ≡⟨ (cong (λ x → gst ⊗ x) (AppHom.respPure homf s)) ⟩
+--       (⟨⟩ (f (pure (λ fs → fs s)) ⊗ gst ≡⟨ cong (λ x → x ⊗ gst) (AppHom.respPure homf (λ fs → fs s)) ⟩
+--       (⟨⟩ ApplicativeOKP.lawCom GOK gst s))))
 
 
 record TraversableOKP F {{TF : Traversable F}} : Set₁ where
@@ -395,14 +398,126 @@ record TraversableOKP F {{TF : Traversable F}} : Set₁ where
 
 lengthContentsShape :
   ∀ {F} {{TF : Traversable F}} → TraversableOKP F →
-  ∀ {X} (fx : F X) → proj₁ (contextT fx) ≡ sizeT (shapeT fx)
+  ∀ {X} (fx : F X) → fst (contextT fx) ≡ sizeT (shapeT fx)
 lengthContentsShape tokF fx =
-  proj₁ (contextT fx)
+  fst (contextT fx)
     ⟨ TraversableOKP.lawHom tokF {{monoidApplicative}} {{monoidApplicative}}
-        proj₁ one (monoidApplicativeHom proj₁) fx ⟩≡
+        fst one (monoidApplicativeHom fst) fx ⟩≡
   sizeT fx ⟨ TraversableOKP.lawCo tokF {{monoidApplicative}} {{applicativeId}} (λ _ → 1) (λ _ → <>) fx ⟩≡ (sizeT (shapeT fx) □)
 
 toNormal : ∀ {F} {{TF : Traversable F}} → TraversableOKP F →
            ∀ {X} → F X → ⟦ normalT F ⟧ X
 toNormal tokF fx =
-  (shapeT fx) , (subst (lengthContentsShape tokF fx) (Vec _) (proj₂ (contextT fx)))
+  (shapeT fx) , (subst (lengthContentsShape tokF fx) (Vec _) (snd (contextT fx)))
+
+
+Batch : Set → Set → Set
+Batch X Y = Σ[ n ∈ ℕ ] (Vec X n → Y)
+
+
+chop : ∀ {m X} n → Vec X (n + m) → Vec X n × Vec X m
+chop zero vx = <> , vx
+chop (suc n) (x , vx) with chop n vx
+chop (suc n) (x , vx) | a , b = (x , a) , b
+
+instance
+  applicativeBatch : ∀ {X} → Applicative (Batch X)
+  applicativeBatch = record
+    { pure = λ z → zero , (λ _ → z)
+    ; _⊗_ = uncurry (λ m f → uncurry (λ n g → (n + m)
+                    , (λ xx → let ss = chop n xx in f (snd ss) (g (fst ss)))))
+    }
+
+eno : ∀ {X} → Vec X 1 → X
+eno (x , _) = x
+
+help : ∀ {X F} {{TF : Traversable F}} → F One → Batch X (F X)
+help {X} fx = traverse (λ _ → 1 , eno) fx
+
++suc : (a b : ℕ) → suc a + b ≡ a + suc b
++suc zero b = refl
++suc (suc a) b rewrite +suc a b = refl
+
++commu : (a b : ℕ) → a + b ≡ b + a
++commu zero b rewrite b +zero = refl
++commu (suc a) b rewrite +commu a b | +suc b a = refl
+
+fstHom' : ∀ {X} → AppHom {{applicativeBatch {X}}} {{monoidApplicative}} fst
+fstHom' = record { respPure = λ {X} x → refl ; resp⊗ = λ s f → +commu (fst f) (fst s) }
+
+
+someConherence :
+  ∀ {F} {{TF : Traversable F}} → TraversableOKP F →
+  ∀ {X} → (fx : F One) → fst (help {X} fx) ≡ sizeT fx
+someConherence tokF {X} fx =
+  fst (help fx)
+    ⟨ TraversableOKP.lawHom tokF {{applicativeBatch}} {{monoidApplicative}}
+        fst (λ _ → 1 , eno) fstHom' fx ⟩≡
+  TraversableOKP.lawCo tokF {{applicativeId}}{{monoidApplicative}}{S = X}
+    (\ _ -> <>) (\ _ -> 1) fx
+
+fromNormal : ∀ {F} {{TF : Traversable F}} → TraversableOKP F →
+             ∀ {X} → ⟦ normalT F ⟧ X → F X
+fromNormal tokF {X} (fx , vs) with help {X} fx | someConherence tokF {X} fx
+fromNormal tokF (fx , vs) | _ , f | refl = f vs
+
+
+data Tree (N : Normal) : Set where
+  <_> : ⟦ N ⟧ (Tree N) → Tree N
+
+NatT : Normal
+NatT = Two / 0 <?> 1
+
+zeroT : Tree NatT
+zeroT = < (tt , <>) >
+
+sucT : Tree NatT → Tree NatT
+sucT n = < (ff , (n , <>)) >
+
+NatInd : ∀ {l} (P : Tree NatT → Set l) →
+           P zeroT →
+           ((n : Tree NatT) → P n → P (sucT n)) →
+           (n : Tree NatT) → P n
+NatInd P z s < tt , <> > = z
+NatInd P z s < ff , (x , <>) > = s x (NatInd P z s x)
+
+All : ∀ {l X} (P : X → Set l) {n} → Vec X n → Set l
+All P <> = One
+All P (x , xs) = P x × All P xs
+
+induction : ∀ (N : Normal) {l} (P : Tree N → Set l) →
+              ((s : Shape N) (ts : Vec (Tree N) (size N s)) → All P ts → P < (s , ts) >) →
+              (t : Tree N) → P t
+induction N P p < s , ts > = p s ts (hyps ts) where
+  hyps : ∀ {n} (ts : Vec (Tree N) n) → All P ts
+  hyps <> = <>
+  hyps (x , xs) = (induction N P p x) , (hyps xs)
+
+Dec : Set → Set
+Dec X = X ⊹ (X → ⊥)
+
+mutual
+
+  eqN? : (N : Normal) (sheq? : (s s' : Shape N) → Dec (s ≡ s')) →
+        (t t' : Tree N) → (Dec (t ≡ t'))
+  eqN? N sheq? < tsh , tvs > < t'sh , t'vs > with sheq? tsh t'sh
+  eqN? N sheq? < tsh , tvs > < .tsh , t'vs > | tt , refl with eqs? N sheq? tvs t'vs
+  eqN? N sheq? < tsh , tvs > < .tsh , .tvs > | tt , refl | tt , refl = tt , refl
+  eqN? N sheq? < tsh , tvs > < .tsh , t'vs > | tt , refl | ff , no = ff , no ∘ inj
+    where inj : ∀ {s} {tvs t'vs : Vec (Tree N) (size N s)} → < (s , tvs) > ≡ < (s , t'vs) > → tvs ≡ t'vs
+          inj refl = refl
+  eqN? N sheq? < tsh , tvs > < t'sh , t'vs > | ff , no = ff , no ∘ inj
+    where inj : ∀ {s v} {tvs : Vec (Tree N) (size N s)} {t'vs : Vec (Tree N) (size N v)} → < (s , tvs) > ≡ < (v , t'vs) > → s ≡ v
+          inj refl = refl
+
+  eqs? : (N : Normal) (sheq? : (s s' : Shape N) → Dec (s ≡ s')) →
+         {n : ℕ} (ts vs : Vec (Tree N) n) → Dec (ts ≡ vs)
+  eqs? N sheq? {zero} <> <> = tt , refl
+  eqs? N sheq? {suc n} (t , ts) (v , vs) with eqN? N sheq? t v | eqs? N sheq? ts vs
+  eqs? N sheq? {suc n} (t , ts) (.t , .ts) | tt , refl | tt , refl = tt , refl
+  eqs? N sheq? {suc n} (t , ts) (.t , vs) | tt , refl | ff , no = ff , (no ∘ inj)
+    where inj : ∀ {n X} {v : X} {ts vs : Vec X n} → _≡_ {A = Vec X (suc n)} (v , ts) (v , vs) → ts ≡ vs
+          inj refl = refl
+  eqs? N sheq? {suc n} (t , ts) (v , vs) | ff , no | _ = ff , (no ∘ inj)
+    where inj : ∀ {n X} {t v : X} {ts vs : Vec X n} → _≡_ {A = Vec X (suc n)} (t , ts) (v , vs) → t ≡ v
+          inj refl = refl

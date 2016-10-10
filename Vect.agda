@@ -3,7 +3,7 @@ module Vect where
 open import Data.Nat
 open import Data.Product hiding (zip; map; swap)
 open import Function using (_∘_; id)
-open import Agda.Builtin.Equality
+open import Agda.Primitive
 
 
 data Vec (X : Set) : ℕ → Set where
@@ -152,7 +152,9 @@ instance
 transpose : ∀ {m n X} → Vec (Vec X n) m → Vec (Vec X m) n
 transpose vs = traverse id vs
 
-data One : Set where <> : One
+record One {l : Level} : Set l where
+  constructor <>
+open One public
 
 crush : ∀ {F X Y} {{TF : Traversable F}} {{M : Monoid Y}} →
           (X → Y) → F X → Y
