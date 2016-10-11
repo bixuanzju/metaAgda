@@ -3,7 +3,8 @@ module Vect where
 open import Data.Nat
 open import Data.Product hiding (zip; map; swap)
 open import Function using (_∘_; id)
-open import Agda.Primitive
+
+open import Basics
 
 
 data Vec (X : Set) : ℕ → Set where
@@ -12,7 +13,7 @@ data Vec (X : Set) : ℕ → Set where
 
 zip : ∀ {n S T} → Vec S n → Vec T n → Vec (S × T) n
 zip <> <> = <>
-zip (x , ss) (x₁ , tt) = (x , x₁) , zip ss tt
+zip (x , ss) (x₁ , vv) = (x , x₁) , zip ss vv
 
 -- Ex 1.1
 vec : ∀ {n X} → X → Vec X n
@@ -152,10 +153,6 @@ instance
 transpose : ∀ {m n X} → Vec (Vec X n) m → Vec (Vec X m) n
 transpose vs = traverse id vs
 
-record One {l : Level} : Set l where
-  constructor <>
-open One public
-
 crush : ∀ {F X Y} {{TF : Traversable F}} {{M : Monoid Y}} →
           (X → Y) → F X → Y
 crush {{M = M}} = traverse {T = One} {{AG = monoidApplicative {{M}}}}
@@ -169,12 +166,3 @@ traversableId = record {traverse = λ f x → f x}
 
 traversableComp : ∀ {F G} → Traversable F → Traversable G → Traversable (F ∘ G)
 traversableComp tF tG = record {traverse = λ f fgs → (traverse {{tF}} (λ gs → traverse {{tG}} f gs) fgs)}
-
-data Two : Set where tt ff : Two
-
-_<?>_ : ∀ {l} {P : Two → Set l} → P tt → P ff → (b : Two) → P b
-(t <?> f) tt = t
-(t <?> f) ff = f
-
-_⊹_ : Set → Set → Set
-S ⊹ T = Σ Two (S <?> T)

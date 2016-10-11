@@ -4,9 +4,10 @@ open import Data.Nat
 open import Data.Product hiding (zip; map; swap) renaming (proj₁ to fst; proj₂ to snd)
 open import Function using (_∘_; id)
 open import Agda.Builtin.Equality
-open import Data.Empty
 
+open import Basics
 open import Vect
+
 
 record Normal : Set₁ where
   constructor _/_
@@ -132,9 +133,6 @@ otamot (suc n) m (xs , xss) = xs ++ otamot n m xss
 swap : (F G : Normal) → (F ⊜ G) →ₙ (G ⊜ F)
 swap F G (shF , shG) = (shG , shF) , otamot (size G shG) (size F shF) (transpose (tomato (size F shF) (size G shG) (tabulate id)))
 
-subst : ∀ {k l} {X : Set k} {s t : X} → s ≡ t → (P : X → Set l) → P s → P t
-subst refl P p = p
-
 drop : (F G : Normal) → (F ⊜ G) →ₙ (F ∘ₙ G)
 drop F G (shF , shG) = (shF , (vec shG)) , subst (help (size F shF)) (Vec _) (tabulate id) where
   help : ∀ n → (n * size G shG) ≡ crush (size G) (vec {n} shG)
@@ -213,23 +211,6 @@ vecEndoFunctorOKP = record { endoFunctorId = vappid ; endoFunctorCo = vappco } w
   vappco f g <> = refl
   vappco f g (x , xs) rewrite vappco f g xs = refl
 
-
-_≡⟨_⟩_  : ∀ {l} {X : Set l} (x : X) {y z} → x ≡ y → y ≡ z → x ≡ z
-_ ≡⟨ refl ⟩ q = q
-
-_⟨_⟩≡_ : ∀ {l} {X : Set l} (x : X) {y z} → y ≡ x → y ≡ z → x ≡ z
-_ ⟨ refl ⟩≡ q = q
-
-⟨⟩_ : ∀ {l} {X : Set l} {x y : X} → x ≡ y → y ≡ x
-⟨⟩ refl = refl
-
-_□ : ∀ {l} {X : Set l} (x : X) → x ≡ x
-x □ = refl
-
-infixr 1 _≡⟨_⟩_ _⟨_⟩≡_ _□
-
-cong : ∀ {k l} {X : Set k} {Y : Set l} (f : X → Y) {x y} → x ≡ y → f x ≡ f y
-cong f refl = refl
 
 record ApplicativeOKP F {{AF : Applicative F}} : Set₁ where
   field
@@ -492,9 +473,6 @@ induction N P p < s , ts > = p s ts (hyps ts) where
   hyps : ∀ {n} (ts : Vec (Tree N) n) → All P ts
   hyps <> = <>
   hyps (x , xs) = (induction N P p x) , (hyps xs)
-
-Dec : Set → Set
-Dec X = X ⊹ (X → ⊥)
 
 mutual
 
