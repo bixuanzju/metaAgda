@@ -1,10 +1,5 @@
 module Normal where
 
-open import Data.Nat
-open import Data.Product hiding (zip; map; swap) renaming (proj₁ to fst; proj₂ to snd)
-open import Function using (_∘_; id)
-open import Agda.Builtin.Equality
-
 open import Basics
 open import Vect
 
@@ -33,10 +28,10 @@ IKₙ : Normal
 IKₙ = VecN 1
 
 _+ₙ_ : Normal → Normal → Normal
-(ShF / szF) +ₙ (ShG / scG) = (ShF ⊹ ShG) / uncurry (szF <?> scG)
+(ShF / szF) +ₙ (ShG / scG) = (ShF ⊹ ShG) / vv szF <?> scG
 
 _×ₙ_ : Normal → Normal → Normal
-(ShF / szF) ×ₙ (ShG / scG) = (ShF × ShG) / uncurry (λ f g → szF f + scG g)
+(ShF / szF) ×ₙ (ShG / scG) = (ShF × ShG) / vv λ f g → szF f + scG g
 
 nInj : ∀ {X} (F G : Normal) → ⟦ F ⟧ X ⊹ ⟦ G ⟧ X → ⟦ F +ₙ G ⟧ X
 nInj F G (tt , ShF , xs) = (tt , ShF) , xs
@@ -61,7 +56,7 @@ _++_ : ∀ {m n X} → Vec X m → Vec X n → Vec X (m + n)
 nPair : ∀ {X} (F G : Normal) → ⟦ F ⟧ X × ⟦ G ⟧ X → ⟦ F ×ₙ G ⟧ X
 nPair F G ((ShF , xsF) , ShG , xsG) = (ShF , ShG) , (xsF ++ xsG)
 
-vSplit : ∀ m n {X} (xs : Vec X (m + n)) → Image (uncurry (_++_ {m}{n}{X})) ∋ xs
+vSplit : ∀ m n {X} (xs : Vec X (m + n)) → Image (vv _++_ {m}{n}{X}) ∋ xs
 vSplit zero n xs = from (<> , xs)
 vSplit (suc m) n (x , xs) with vSplit m n xs
 vSplit (suc m) n (x , .(y ++ ys)) | from (y , ys) = from ((x , y) , ys)
@@ -82,7 +77,7 @@ sumMonoid = record { ε = zero ; _·_ = _+_ }
 
 normalTraversable : (F : Normal) → Traversable ⟦ F ⟧
 normalTraversable F =
-  record { traverse = λ {{aG}} f → uncurry (λ s xs → pure {{aG}} (_,_ s) ⊗ traverse f xs) }
+  record { traverse = λ {{aG}} f → vv λ s xs → pure {{aG}} (_,_ s) ⊗ traverse f xs }
 
 _∘ₙ_ : Normal → Normal → Normal
 F ∘ₙ (ShG / szG) = (⟦ F ⟧ ShG) / crush {{normalTraversable F}} szG
@@ -119,7 +114,7 @@ morphN {F} f s | sh , xs = sh , xs
 
 -- Ex 1.16
 _⊜_ : Normal → Normal → Normal
-(ShF / szF) ⊜ (ShG / szG) = ShF × ShG / uncurry (λ f g → szF f * szG g)
+(ShF / szF) ⊜ (ShG / szG) = ShF × ShG / vv λ f g → szF f * szG g
 
 tomato : ∀ m n {X} → Vec X (m * n) → Vec (Vec X n) m
 tomato zero n xs = <>
@@ -165,18 +160,18 @@ natMonoidOK = record
 listNMonoidOK : {X : Set} → MonoidOk (⟦ ListN ⟧ X)
 listNMonoidOK {X} = record
   { absorbL = λ _ → refl
-  ; absorbR =  uncurry aR
-  ; assoc = uncurry aa
+  ; absorbR =  vv aR
+  ; assoc = vv aa
   } where
   aR : ∀ n (xs : Vec X n) → (n , xs) · ε {{listNMonoid}} ≡ (n , xs)
   aR zero <> = refl
   aR (suc n) (x , xs) = subst (aR n xs)
-                          (uncurry (λ m ys → (suc (n + 0) , x , (xs ++ <>)) ≡ (suc m , x , ys))) refl
+                          (vv λ m ys → (suc (n + 0) , x , (xs ++ <>)) ≡ (suc m , x , ys)) refl
   aa : ∀ n (xs : Vec X n) (ys zs : ⟦ ListN ⟧ X) →
        ((n , xs) · ys) · zs ≡ (n , xs) · (ys · zs)
   aa zero <> ys zs = refl
   aa (suc n) (x , xs) (i , ys) (j , zs) =
-    subst (aa n xs (i , ys) (j , zs)) (uncurry (λ m ms → _≡_ {_} {⟦ ListN ⟧ X} (suc (n + i + j) , (x , ((xs ++ ys) ++ zs))) (suc m , (x , ms)))) refl
+    subst (aa n xs (i , ys) (j , zs)) (vv λ m ms → _≡_ {_} {⟦ ListN ⟧ X} (suc (n + i + j) , (x , ((xs ++ ys) ++ zs))) (suc m , (x , ms))) refl
 
 -- Ex 1.18
 -- I cannot even write the type because _≡_ requires the types of the arguments syntactically equal.
@@ -405,8 +400,8 @@ instance
   applicativeBatch : ∀ {X} → Applicative (Batch X)
   applicativeBatch = record
     { pure = λ z → zero , (λ _ → z)
-    ; _⊗_ = uncurry (λ m f → uncurry (λ n g → (n + m)
-                    , (λ xx → let ss = chop n xx in f (snd ss) (g (fst ss)))))
+    ; _⊗_ = vv λ m f → vv λ n g → (n + m)
+                    , (λ xx → let ss = chop n xx in f (snd ss) (g (fst ss)))
     }
 
 eno : ∀ {X} → Vec X 1 → X

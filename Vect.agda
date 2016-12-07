@@ -1,9 +1,5 @@
 module Vect where
 
-open import Data.Nat
-open import Data.Product hiding (zip; map; swap)
-open import Function using (_∘_; id)
-
 open import Basics
 
 
@@ -129,7 +125,7 @@ instance
 applicativeProd : ∀ {F G} → Applicative F → Applicative G → Applicative λ X → F X × G X
 applicativeProd AF AG = record
   { pure = λ x → pure {{AF}} x , pure {{AG}} x
-  ; _⊗_ = uncurry (λ fs gs → uncurry (λ f g → _⊗_ {{AF}} fs f , _⊗_ {{AG}} gs g))
+  ; _⊗_ = vv λ fs gs → vv λ f g → _⊗_ {{AF}} fs f , _⊗_ {{AG}} gs g
   }
 
 
