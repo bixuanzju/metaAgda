@@ -72,7 +72,7 @@ Shub Γ Δ = ∀ Ξ → Sub (Γ <>< Ξ) (Δ <>< Ξ)
 
 _//_ : ∀ {Γ Δ} (θ : Shub Γ Δ) {τ} → Γ ⊢ τ → Δ ⊢ τ
 θ // var x = θ [] x
-θ // lam t = lam ((λ Ξ t → θ (_ ∷ Ξ) t) // t)
+θ // lam t = lam ((λ l x → θ (_ ∷ l) x) // t)
 θ // app f s = app (θ // f) (θ // s)
 
 wkr : ∀ {Γ Δ σ} → Ren Γ Δ → Ren (Γ ,, σ) (Δ ,, σ)
@@ -80,41 +80,48 @@ wkr r zero = zero
 wkr r (suc t) = suc (r t)
 
 ren : ∀ {Γ Δ} → Ren Γ Δ → Shub Γ Δ
-ren r [] = var ∘ r
-ren r (_ ∷ Ξ) = ren (wkr r) Ξ
+ren r [] = λ x → var (r x)
+ren r (_ ∷ Ξ) = λ x → ren (wkr r) Ξ x
 
 wks : ∀ {Γ Δ σ} → Sub Γ Δ → Sub (Γ ,, σ) (Δ ,, σ)
 wks s zero = var zero
-wks s (suc t) = ren suc // s t
+wks s (suc t) = ren suc // (s t)
 
 sub : ∀ {Γ Δ} → Sub Γ Δ → Shub Γ Δ
 sub s [] = s
-sub s (x ∷ Ξ) = sub (wks s) Ξ
+sub s (_ ∷ Ξ) = sub (wks s) Ξ
 
 weak : ∀ {Γ} Ξ → Ren Γ (Γ <>< Ξ)
 weak [] i = i
 weak (_ ∷ Ξ) i = weak Ξ (suc i)
 
+lambda' : ∀ {Γ σ τ} → ((∀ {Ξ} → Γ ,, σ <>< Ξ ⊢ σ) → Γ ,, σ ⊢ τ) → Γ ⊢ σ ▹ τ
+lambda' f = lam (f (λ {Ξ} → var (weak Ξ zero)))
 
 _<>>_ : ∀ {X} → Cx X → List X → List X
 ε <>> ys = ys
 (xz ,, x) <>> ys = xz <>> (x ∷ ys)
 infixl 4 _<>>_
 
+
+lem2 : ∀ {X} → (xs ys : List X) → (Γ : Cx X) → xs ≡ Γ <>> ys → Γ <>< ys ≡ ε <>< xs
+lem2 xs ys ε q rewrite q = refl
+lem2 xs ys (Γ ,, y) q = lem2 xs (y ∷ ys) Γ q
+
+
+lem1 : ∀ {X} → (Δ Γ : Cx X) → (xs ys : List X) → Δ <>> xs ≡ Γ <>> ys → Γ <>< ys ≡ Δ <>< xs
+lem1 ε Γ xs ys q = lem2 xs ys Γ q
+lem1 (Δ ,, x) Γ xs ys q = lem1 Δ Γ (x ∷ xs) ys q
+
+
+-- Ex 2.1
 lem : ∀ {X} (Δ Γ : Cx X) Ξ →
       (Δ <>> []) ≡ (Γ <>> Ξ) → (Γ <>< Ξ) ≡ Δ
-lem Δ Γ Ξ q = {!!}
+lem Δ Γ Ξ q = lem1 Δ Γ [] Ξ q
 
-lambda : ∀ {Γ σ τ} →
-         ((∀ {Δ Ξ} {{_ : (Δ <>> []) ≡ (Γ <>> σ ∷ Ξ)}} → Δ ⊢ σ) →
-           Γ ,, σ ⊢ τ) →
-         Γ ⊢ σ ▹ τ
-lambda {Γ} f = lam (f λ {Δ Ξ} {{q}} → subst (lem Δ Γ (_ ∷ Ξ) q) (λ Γ₁ → Γ₁ ⊢ _) (var (weak Ξ zero)))
+lambda : ∀ {Γ σ τ} → ((∀ {Δ Ξ} {{_ : (Δ <>> []) ≡ (Γ <>> σ ∷ Ξ)}} → Δ ⊢ σ) → Γ ,, σ ⊢ τ) → Γ ⊢ σ ▹ τ
+lambda {Γ} f = lam (f (λ {Δ Ξ} {{q}} → subst (lem Δ Γ (_ ∷ Ξ) q) (λ Γ₁ → Γ₁ ⊢ _) (var (weak Ξ zero))))
 
-myTest : ε ⊢ (ι ▹ ι) ▹ (ι ▹ ι)
-myTest = lambda λ f → lambda (λ x → app (f {{refl}}) (app (f {{refl}}) (x {{refl}})))
-
-data Fin : ℕ → Set where
-  zero : ∀ {n} → Fin (suc n)
-  suc  : ∀ {n} → Fin n → Fin (suc n)
-
+-- Why?
+_ : ε ⊢ (ι ▹ ι) ▹ ι ▹ ι
+_ = lambda λ f → lambda λ x → app (f {{refl}}) (app (f {{refl}}) (x {{refl}}))
