@@ -125,3 +125,86 @@ lambda {Γ} f = lam (f (λ {Δ Ξ} {{q}} → subst (lem Δ Γ (_ ∷ Ξ) q) (λ 
 -- Why?
 _ : ε ⊢ (ι ▹ ι) ▹ ι ▹ ι
 _ = lambda λ f → lambda λ x → app (f {{refl}}) (app (f {{refl}}) (x {{refl}}))
+
+mutual
+  -- Normal forms
+  data _⊨_ (Γ : Cx ⋆) : ⋆ → Set where
+    lam : ∀ {σ τ} → Γ ,, σ ⊨ τ → Γ ⊨ σ ▹ τ
+    _$_ : ∀ {τ} → τ ∈ Γ → Γ ⊨* τ → Γ ⊨ ι
+
+  -- Spines
+  data _⊨*_ (Γ : Cx ⋆) : ⋆ → Set where
+    <> : Γ ⊨* ι
+    _,_ : ∀ {τ σ} → Γ ⊨ σ → Γ ⊨* τ → Γ ⊨* σ ▹ τ
+
+infix 3 _⊨_ _⊨*_
+infix 3 _$_
+
+-- Ex 2.2
+_-×_ : ∀ (Γ : Cx ⋆) {τ} (x : τ ∈ Γ) → Cx ⋆
+ε -× ()
+(Γ ,, y) -× zero = Γ
+(Γ ,, y) -× suc x = Γ -× x ,, y
+
+_≠_ : ∀ {Γ σ} (x : σ ∈ Γ) → Ren (Γ -× x) Γ
+zero ≠ y = suc y
+suc x ≠ zero = zero
+suc x ≠ suc y = suc (x ≠ y)
+
+data Veq? {Γ σ} (x : σ ∈ Γ) : ∀ {τ} → τ ∈ Γ → Set where
+  same : Veq? x x
+  diff : ∀ {τ} (y : τ ∈ Γ -× x) → Veq? x (x ≠ y)
+
+-- Ex 2.3
+veq? : ∀ {Γ σ τ} (x : σ ∈ Γ) (y : τ ∈ Γ) → Veq? x y
+veq? zero zero = same
+veq? zero (suc y) = diff y
+veq? (suc x) zero = diff zero
+veq? (suc x) (suc y) with veq? x y
+veq? (suc x) (suc .x) | same = same
+veq? (suc x) (suc .(x ≠ y)) | diff y = diff (suc y)
+
+-- Ex 2.4
+mutual
+  renNm : ∀ {Γ Δ τ} → Ren Γ Δ → Γ ⊨ τ → Δ ⊨ τ
+  renNm r (lam t) = lam (renNm (wkr r) t)
+  renNm r (x $ sp) = r x $ renSp r sp
+  renSp : ∀ {Γ Δ τ} → Ren Γ Δ → Γ ⊨* τ → Δ ⊨* τ
+  renSp r <> = <>
+  renSp r (s , ss) = renNm r s , renSp r ss
+
+-- Ex 2.5
+mutual
+  <_/_>_ : ∀ {Γ σ τ} → (x : σ ∈ Γ) → Γ -× x ⊨ σ → Γ ⊨ τ → Γ -× x ⊨ τ
+  < x / s > lam t = lam (< suc x / renNm suc s > t)
+  < x / s > (r $ ss) with veq? x r
+  < x / s > (.x $ ss) | same = s $$ (< x / s >* ss)
+  < x / s > (.(x ≠ y) $ ss) | diff y =  y $ (< x / s >* ss)
+
+  <_/_>*_ : ∀ {Γ σ τ} → (x : σ ∈ Γ) → Γ -× x ⊨ σ → Γ ⊨* τ → Γ -× x ⊨* τ
+  < x / s >* <> = <>
+  < x / s >* (t , ts) = (< x / s > t) , < x / s >* ts
+
+  _$$_ : ∀ {Γ τ} → Γ ⊨ τ → Γ ⊨* τ → Γ ⊨ ι
+  f $$ <> = f
+  lam f $$ (s , ss) = (< zero / s > f) $$ ss
+
+
+eta-long : ∀ {Γ σ} (x : σ ∈ Γ) t → (∀ {Δ} → Ren Γ Δ → Δ ⊨* t → Δ ⊨* σ) → Γ ⊨ t
+eta-long x ι f = x $ f id <>
+eta-long x (t₁ ▹ t₂) f = lam (eta-long (suc x) t₂ (λ rho ss → f (rho ∘ suc) (eta-long (rho zero) t₁ (λ _ → id) , ss)))
+
+normalize : ∀ {Γ τ} → Γ ⊢ τ → Γ ⊨ τ
+normalize (var x) = eta-long x _ (λ _ → id)
+normalize (lam t) = lam (normalize t)
+normalize (app f s) with normalize f | normalize s
+normalize (app f s) | lam f' | s' = < zero / s' > f'
+
+try₁ : ε ⊨ ((ι ▹ ι) ▹ (ι ▹ ι)) ▹ (ι ▹ ι) ▹ (ι ▹ ι)
+try₁ = normalize (lambda (λ x → x {{refl}}))
+
+church₂ : ∀ {τ} → ε ⊢ (τ ▹ τ) ▹ τ ▹ τ
+church₂ = lambda λ f → lambda λ x → app (f {{refl}}) (app (f {{refl}}) (x {{refl}}))
+
+try₂ : ε ⊨ (ι ▹ ι) ▹ (ι ▹ ι)
+try₂ = normalize (app (app church₂ church₂) church₂)
