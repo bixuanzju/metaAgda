@@ -100,3 +100,6 @@ suc n - suc m = n - m
 _*_ : ℕ → ℕ → ℕ
 zero  * m = zero
 suc n * m = m + n * m
+
+magic : Zero → {A : Set} → A
+magic ()
