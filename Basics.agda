@@ -10,7 +10,6 @@ data _≡_ {a} {A : Set a} (x : A) : A → Set a where
   instance refl : x ≡ x
 infix 1 _≡_
 {-# BUILTIN EQUALITY _≡_  #-}
-{-# BUILTIN REFL     refl #-}
 
 subst : ∀ {k l} {X : Set k} {s t : X} → s ≡ t → (P : X → Set l) → P s → P t
 subst refl P p = p

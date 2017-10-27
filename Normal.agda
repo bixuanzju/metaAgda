@@ -285,78 +285,78 @@ homSum {F} {G} {{AF}} {{AG}} f = record
   h (ff , gst) (ff , gs) = ff , (gst ⊗ gs)
 
 -- Comment for the sake of compilation speed
--- homSumOKP : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
---             ApplicativeOKP F → ApplicativeOKP G →
---             (f : F →̇ G) → AppHom {{AF}} {{AG}} f →
---             ApplicativeOKP _ {{homSum {{AF}} {{AG}} f}}
--- homSumOKP {F} {G} {{AF}} {{AG}} FOK GOK f homf = record
---   { lawId = homSumId
---   ; lawCo = homSumCo
---   ; lawHom = homSumHom
---   ; lawCom = homSumCom
---   } where
---   homSumId : ∀ {X} (x : Σ Two (F X <?> G X)) →
---       (_⊗_ {{homSum f}} (pure {{homSum f}} id) x) ≡ x
---   homSumId (tt , fx) rewrite ApplicativeOKP.lawId FOK fx = refl
---   homSumId (ff , gx) =
---     cong (λ x → ff , x)
---          ((f (pure id)) ⊗ gx
---              ≡⟨ cong (λ x → _⊗_ x gx) (AppHom.respPure homf id) ⟩
---                 ApplicativeOKP.lawId GOK gx)
---   homSumCo : ∀ {R S T} → (fs : F (S → T) ⊹ G (S → T)) → (g : F (R → S) ⊹ G (R → S)) → (r : F R ⊹ G R) →
---              _⊗_ {{homSum f}} (_⊗_ {{homSum f}} (_⊗_ {{homSum f}} (pure {{homSum f}} (λ aa bb → aa ∘ bb)) fs) g) r
---              ≡ _⊗_ {{homSum f}} fs (_⊗_ {{homSum f}} g r)
---   homSumCo (tt , fst) (tt , frs) (tt , fr) = cong (λ x → (tt , x)) (ApplicativeOKP.lawCo FOK fst frs fr)
---   homSumCo (tt , fst) (tt , frs) (ff , gr) =
---     cong (λ x → (ff , x))
---     (f ((pure {{AF}} (λ f g → f ∘ g)) ⊗ fst ⊗ frs) ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ gr) (AppHom.resp⊗ homf (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) frs) ⟩
---     f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ (f frs) ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ (f frs) ⊗ gr) (AppHom.resp⊗ homf (pure (λ aa bb → aa ∘ bb)) fst) ⟩
---     f (pure (λ aa bb → aa ∘ bb)) ⊗ (f fst) ⊗ (f frs) ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ aa bb → aa ∘ bb)) ⟩
---     ApplicativeOKP.lawCo GOK (f fst) (f frs) gr)
---   homSumCo (tt , fst) (ff , grs) (tt , fr) =
---     cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ (f fr)
---       ≡⟨ cong (λ x → x ⊗ grs ⊗ (f fr)) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
---     f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ (f fr)
---       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
---     ApplicativeOKP.lawCo GOK (f fst) grs (f fr))
---   homSumCo (tt , fst) (ff , grs) (ff , gr) =
---     cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ grs ⊗ gr) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
---     f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ gr) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
---     ApplicativeOKP.lawCo GOK (f fst) grs gr)
---   homSumCo (ff , gst) (tt , frs) (tt , fr) =
---     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ (f fr)
---       ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
---       (⟨⟩ (gst ⊗ (f (frs ⊗ fr))
---       ≡⟨ cong (λ x → gst ⊗ x) (AppHom.resp⊗ homf frs fr) ⟩
---       (⟨⟩ ApplicativeOKP.lawCo GOK gst (f frs) (f fr)))))
---   homSumCo (ff , gst) (tt , frs) (ff , gr) =
---     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
---     (ApplicativeOKP.lawCo GOK gst (f frs) gr))
---   homSumCo (ff , gst) (ff , grs) (tt , fr) =
---     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ (f fr)
---       ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
---     (ApplicativeOKP.lawCo GOK gst grs (f fr)))
---   homSumCo (ff , gst) (ff , grs) (ff , gr) =
---     cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ gr
---       ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
---     (ApplicativeOKP.lawCo GOK gst grs gr))
---   homSumHom : ∀ {S T} → (st : S → T) (s : S) →
---               (_⊗_ {{homSum f}} (pure {{homSum f}} st) (pure {{homSum f}} s)) ≡ (pure {{homSum f}} (st s))
---   homSumHom st s  = cong (λ x → (tt , x)) (ApplicativeOKP.lawHom FOK st s)
---   homSumCom : ∀ {S T} → (fg : F (S → T) ⊹ G (S → T)) (s : S) →
---               _⊗_ {{homSum f}} fg (pure {{homSum f}} s) ≡ _⊗_ {{homSum f}} (pure {{homSum f}} (λ f → f s)) fg
---   homSumCom (tt , fst) s = cong (λ x → (tt , x)) (ApplicativeOKP.lawCom FOK fst s)
---   homSumCom (ff , gst) s =
---     cong (λ x → (ff , x)) (gst ⊗ (f (pure s))
---       ≡⟨ (cong (λ x → gst ⊗ x) (AppHom.respPure homf s)) ⟩
---       (⟨⟩ (f (pure (λ fs → fs s)) ⊗ gst ≡⟨ cong (λ x → x ⊗ gst) (AppHom.respPure homf (λ fs → fs s)) ⟩
---       (⟨⟩ ApplicativeOKP.lawCom GOK gst s))))
+homSumOKP : ∀ {F G} {{AF : Applicative F}} {{AG : Applicative G}} →
+            ApplicativeOKP F → ApplicativeOKP G →
+            (f : F →̇ G) → AppHom {{AF}} {{AG}} f →
+            ApplicativeOKP _ {{homSum {{AF}} {{AG}} f}}
+homSumOKP {F} {G} {{AF}} {{AG}} FOK GOK f homf = record
+  { lawId = homSumId
+  ; lawCo = homSumCo
+  ; lawHom = homSumHom
+  ; lawCom = homSumCom
+  } where
+  homSumId : ∀ {X} (x : Σ Two (F X <?> G X)) →
+      (_⊗_ {{homSum f}} (pure {{homSum f}} id) x) ≡ x
+  homSumId (tt , fx) rewrite ApplicativeOKP.lawId FOK fx = refl
+  homSumId (ff , gx) =
+    cong (λ x → ff , x)
+         ((f (pure id)) ⊗ gx
+             ≡⟨ cong (λ x → _⊗_ x gx) (AppHom.respPure homf id) ⟩
+                ApplicativeOKP.lawId GOK gx)
+  homSumCo : ∀ {R S T} → (fs : F (S → T) ⊹ G (S → T)) → (g : F (R → S) ⊹ G (R → S)) → (r : F R ⊹ G R) →
+             _⊗_ {{homSum f}} (_⊗_ {{homSum f}} (_⊗_ {{homSum f}} (pure {{homSum f}} (λ aa bb → aa ∘ bb)) fs) g) r
+             ≡ _⊗_ {{homSum f}} fs (_⊗_ {{homSum f}} g r)
+  homSumCo (tt , fst) (tt , frs) (tt , fr) = cong (λ x → (tt , x)) (ApplicativeOKP.lawCo FOK fst frs fr)
+  homSumCo (tt , fst) (tt , frs) (ff , gr) =
+    cong (λ x → (ff , x))
+    (f ((pure {{AF}} (λ f g → f ∘ g)) ⊗ fst ⊗ frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gr) (AppHom.resp⊗ homf (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) frs) ⟩
+    f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f frs) ⊗ gr) (AppHom.resp⊗ homf (pure (λ aa bb → aa ∘ bb)) fst) ⟩
+    f (pure (λ aa bb → aa ∘ bb)) ⊗ (f fst) ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ aa bb → aa ∘ bb)) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) (f frs) gr)
+  homSumCo (tt , fst) (ff , grs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ grs ⊗ (f fr)) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) grs (f fr))
+  homSumCo (tt , fst) (ff , grs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure {{AF}} (λ f g → f ∘ g) ⊗ fst) ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ grs ⊗ gr) (AppHom.resp⊗ homf (pure (λ f g → f ∘ g)) fst) ⟩
+    f (pure (λ f g → f ∘ g)) ⊗ (f fst) ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ (f fst) ⊗ grs ⊗ gr) (AppHom.respPure homf (pure (λ f g → f ∘ g))) ⟩
+    ApplicativeOKP.lawCo GOK (f fst) grs gr)
+  homSumCo (ff , gst) (tt , frs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+      (⟨⟩ (gst ⊗ (f (frs ⊗ fr))
+      ≡⟨ cong (λ x → gst ⊗ x) (AppHom.resp⊗ homf frs fr) ⟩
+      (⟨⟩ ApplicativeOKP.lawCo GOK gst (f frs) (f fr)))))
+  homSumCo (ff , gst) (tt , frs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ (f frs) ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ (f frs) ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst (f frs) gr))
+  homSumCo (ff , gst) (ff , grs) (tt , fr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ (f fr)
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ (f fr)) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst grs (f fr)))
+  homSumCo (ff , gst) (ff , grs) (ff , gr) =
+    cong (λ x → (ff , x)) (f (pure (λ f g → f ∘ g)) ⊗ gst ⊗ grs ⊗ gr
+      ≡⟨ cong (λ x → x ⊗ gst ⊗ grs ⊗ gr) (AppHom.respPure homf (λ f g → f ∘ g)) ⟩
+    (ApplicativeOKP.lawCo GOK gst grs gr))
+  homSumHom : ∀ {S T} → (st : S → T) (s : S) →
+              (_⊗_ {{homSum f}} (pure {{homSum f}} st) (pure {{homSum f}} s)) ≡ (pure {{homSum f}} (st s))
+  homSumHom st s  = cong (λ x → (tt , x)) (ApplicativeOKP.lawHom FOK st s)
+  homSumCom : ∀ {S T} → (fg : F (S → T) ⊹ G (S → T)) (s : S) →
+              _⊗_ {{homSum f}} fg (pure {{homSum f}} s) ≡ _⊗_ {{homSum f}} (pure {{homSum f}} (λ f → f s)) fg
+  homSumCom (tt , fst) s = cong (λ x → (tt , x)) (ApplicativeOKP.lawCom FOK fst s)
+  homSumCom (ff , gst) s =
+    cong (λ x → (ff , x)) (gst ⊗ (f (pure s))
+      ≡⟨ (cong (λ x → gst ⊗ x) (AppHom.respPure homf s)) ⟩
+      (⟨⟩ (f (pure (λ fs → fs s)) ⊗ gst ≡⟨ cong (λ x → x ⊗ gst) (AppHom.respPure homf (λ fs → fs s)) ⟩
+      (⟨⟩ ApplicativeOKP.lawCom GOK gst s))))
 
 
 record TraversableOKP F {{TF : Traversable F}} : Set₁ where

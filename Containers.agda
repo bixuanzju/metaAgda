@@ -4,23 +4,22 @@ open import Basics
 open import Vect
 open import Normal
 
-
 record Con : Set₁ where
   constructor _◃_
   field
     Sh : Set
     Po : Sh → Set
   ⟦_⟧◃ : Set → Set
-  ⟦_⟧◃ X = Σ Sh λ s → Po s → X
+  ⟦_⟧◃ X = Σ[ s ∈ Sh ] (Po s → X)
 
 open Con public
 infixr 1 _◃_
 
-K : Set → Con
-K A = A ◃ (λ _ → Zero)
+K◃ : Set → Con
+K◃ A = A ◃ (λ _ → Zero)
 
-I : Con
-I = One ◃ (λ _ → One)
+I◃ : Con
+I◃ = One ◃ (λ _ → One)
 
 _+◃_ : Con → Con → Con
 (S ◃ P) +◃ (S' ◃ P') = (S ⊹ S') ◃ vv (P <?> P')
@@ -43,7 +42,9 @@ instance
   conEndoFunctor = record { map = λ f t → fst t , (λ x → f (snd t x)) }
 
 conEndoFunctorOKP : {C : Con} → EndoFunctorOKP ⟦ C ⟧◃
-conEndoFunctorOKP = record { endoFunctorId = λ t → refl ; endoFunctorCo = λ f g x → refl }
+conEndoFunctorOKP = record { endoFunctorId = λ t → refl
+                           ; endoFunctorCo = λ f g x → refl
+                           }
 
 -- 3.2
 conInj : ∀ {X} (F G : Con) → ⟦ F ⟧◃ X ⊹ ⟦ G ⟧◃ X → ⟦ F +◃ G ⟧◃ X
@@ -64,7 +65,7 @@ con∘ A B (shA , poA) = (shA , (λ a → fst (poA a))) , (λ x → snd (poA (fs
 
 
 _→◃_ : Con → Con → Set
-(S ◃ P) →◃ (S' ◃ P') = Σ (S → S') λ f → (s : S) → P' (f s) → P s
+(S ◃ P) →◃ (S' ◃ P') = Σ[ f ∈ (S → S') ] ((s : S) → P' (f s) → P s)
 
 _/◃_ : ∀ {C C'} → C →◃ C' → ∀ {X} → ⟦ C ⟧◃ X → ⟦ C' ⟧◃ X
 (to , fro) /◃ (s , k) = to s , k ∘ fro s
@@ -94,7 +95,7 @@ data W (C : Con) : Set where
 
 -- 3.5
 NatW : Set
-NatW = W (K One +◃ I)
+NatW = W (K◃ One +◃ I◃)
 
 zeroW : NatW
 zeroW = < (tt , <>) , (λ x → magic x) >
@@ -111,3 +112,31 @@ addW x y = precW y (λ _ z → sucW z) x
 
 _ : addW zeroW (sucW zeroW) ≡ sucW zeroW
 _ = refl
+
+-- Fail on the base case, because Agda's equality is too weak?
+-- indW : ∀ {l} (P : NatW → Set l) →
+--          P zeroW →
+--          ((n : NatW) → P n → P (sucW n)) →
+--          (n : NatW) → P n
+-- indW P z s < (tt , <>) , snd₂ > = {!z should fit here!}
+-- indW P z s < (ff , <>) , p > =  s (p <>) (indW P z s (p <>))
+
+_⋆_ : Con → Set → Set
+C ⋆ X = W (K◃ X +◃ C)
+
+-- 3.6
+freeMonad : (C : Con) → Monad (_⋆_ C)
+freeMonad C = record { return = ret ; _>>=_ = bind } where
+  ret : {X : Set} → X → C ⋆ X
+  ret x = < (tt , x) , (λ x → magic x) >
+  bind : {S T : Set} → C ⋆ S → (S → C ⋆ T) → C ⋆ T
+  bind < (tt , s) , p > f = f s
+  bind < (ff , shC) , p > f = < (ff , shC) , (λ po → bind (p po) f) >
+
+-- 3.7
+_⋆◃ : Con → Con
+_⋆◃ C = {!!}
+
+-- 3.8
+call : ∀ {C} → (s : Sh C) → C ⋆ Po C s
+call s = {!!}
